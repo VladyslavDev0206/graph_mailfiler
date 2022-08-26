@@ -1,0 +1,21 @@
+<!-- Copyright (c) Microsoft Corporation.
+     Licensed under the MIT License. -->
+
+<!-- <HomeSnippet> -->
+{% extends "mailfiler/layout.html" %}
+{% block content %}
+<div class="jumbotron">
+  <h1>Graph Mailfiler</h1>
+  <p class="lead">With this app you can use the Microsoft Graph API to access to your data</p>
+  {% if user.is_authenticated %}
+  {% if graphUser.is_authenticated %}
+    <h4>You've signed in to Graph as {{ graphUser.name }}!</h4>
+    <p>Use the navigation bar at the top of the page to get started.</p>
+    <a href="{% url 'disconnect' %}" class="btn btn-primary btn-large">Click here to disconnect</a>
+  {% else %}
+    <a href="{% url 'connect' %}" class="btn btn-primary btn-large">Click here to connect</a>
+  {% endif %}
+  {% endif %}
+</div>
+{% endblock %}
+<!-- </HomeSnippet> -->

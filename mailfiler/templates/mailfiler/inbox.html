@@ -1,0 +1,32 @@
+<!-- Copyright (c) Microsoft Corporation.
+     Licensed under the MIT License. -->
+
+<!-- <CalendarSnippet> -->
+{% extends "mailfiler/layout.html" %}
+{% block content %}
+<h1>Inbox</h1>
+<!-- <a href="/calendar/new" class="btn btn-light btn-sm mb-3">New event</a> -->
+<table class="table">
+  <thead>
+    <tr>
+      <th scope="col">Message</th>
+      <th scope="col">From</th>
+      <th scope="col">Is Read</th>
+      <th scope="col">Received</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% if mails %}
+      {% for mail in mails %}
+        <tr>
+          <td>{{ mail.subject }}</td>
+          <td>{{ mail.from.emailAddress.name }}</td>
+          <td>{{ mail.isRead }}</td>
+          <td>{{ mail.receivedDateTime }}</td>
+        </tr>
+      {% endfor %}
+    {% endif %}
+  </tbody>
+</table>
+{% endblock %}
+<!-- </CalendarSnippet> -->
