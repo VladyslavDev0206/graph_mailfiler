@@ -60,7 +60,7 @@ def get_inbox(token, timezone):
 
   endpoint = '/me/mailFolders/inbox/messages'
   # Only request specific properties
-  select = 'from,isRead,receivedDateTime,subject'
+  select = 'id,from,isRead,receivedDateTime,subject'
   # Get at most 25 results
   top = 25
   # Sort by received time, newest first

@@ -3,6 +3,5 @@ app_secret: "6Tl8Q~BcHOy0jCQ_O68wgCfoZ_gpvadi53KUZaHw"
 redirect: "http://localhost:8000/callback"
 scopes:
   - user.read
-  - mailboxsettings.read
-  - calendars.readwrite
+  - mail.readwrite
 authority: "https://login.microsoftonline.com/common"

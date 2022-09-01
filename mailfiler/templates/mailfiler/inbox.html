@@ -9,6 +9,7 @@
 <table class="table">
   <thead>
     <tr>
+      <!-- <th scope="col">Id</th> -->
       <th scope="col">Message</th>
       <th scope="col">From</th>
       <th scope="col">Is Read</th>
@@ -19,6 +20,7 @@
     {% if mails %}
       {% for mail in mails %}
         <tr>
+          <!-- <td>{{ mail.id }}</td> -->
           <td>{{ mail.subject }}</td>
           <td>{{ mail.from.emailAddress.name }}</td>
           <td>{{ mail.isRead }}</td>

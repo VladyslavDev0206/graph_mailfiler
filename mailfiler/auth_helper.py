@@ -37,7 +37,7 @@ def get_msal_app(cache=None):
 # Method to generate a sign-in flow
 def get_sign_in_flow():
   auth_app = get_msal_app()
-
+  
   return auth_app.initiate_auth_code_flow(
     settings['scopes'],
     redirect_uri=settings['redirect'])
