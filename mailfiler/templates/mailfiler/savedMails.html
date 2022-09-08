@@ -4,18 +4,15 @@
 <!-- <CalendarSnippet> -->
 {% extends "mailfiler/layout.html" %}
 {% block content %}
-<a href="{% url 'saveMail' %}" class="btn btn-primary">Saved Mails</a>
-<button class="btn btn-success float-right" onclick="saveMails()">Save</button>
+<h1>Saved Mails on S3 Bucket</h1>
 <!-- <a href="/calendar/new" class="btn btn-light btn-sm mb-3">New event</a> -->
 {% csrf_token %}
 <table class="table">
   <thead>
     <tr>
       <!-- <th scope="col">Id</th> -->
-      <th scope="col">Message</th>
-      <th scope="col">From</th>
-      <th scope="col">Is Read</th>
-      <th scope="col">Received</th>
+      <th scope="col">Title</th>
+      <th scope="col">Url</th>
     </tr>
   </thead>
   <tbody>
@@ -23,10 +20,8 @@
       {% for mail in mails %}
         <tr>
           <!-- <td>{{ mail.id }}</td> -->
-          <td>{{ mail.subject }}</td>
-          <td>{{ mail.from.emailAddress.name }}</td>
-          <td>{{ mail.isRead }}</td>
-          <td>{{ mail.receivedDateTime }}</td>
+          <td>{{ mail.title }}</td>
+          <td><a href="{{ mail.document }}">click here</a></td>
         </tr>
       {% endfor %}
     {% endif %}
@@ -53,14 +48,16 @@
     title = $('p[name="email"]').text()
     title = (title.split('@')[0]).slice(0, 5)
     title += '_' + formatDate(new Date(Date.now()))
+    console.log(title)
 
-    $.post("{% url 'saveMail' %}",
+    $.post("mail/save",
     {
       mails : mails,
       title : title
     },
     function(data, status){
-      alert('Mail Saved Successfuly')
+      if(data == 'success')
+        alert('saved successufuly')
     });
   }
   // add csrf token

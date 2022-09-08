@@ -1,3 +1,4 @@
+from urllib.request import url2pathname
 from django.shortcuts import render, redirect
 from django.http import HttpResponse, HttpResponseRedirect
 from django.urls import reverse
@@ -9,6 +10,12 @@ from mailfiler.auth_helper import get_sign_in_flow, get_token_from_code, store_u
 from mailfiler.graph_helper import *
 from .forms import NewUserForm
 from django.contrib.auth.forms import AuthenticationForm 
+from rest_framework import viewsets, parsers
+from .models import DropBox
+from .serializers import DropBoxSerializer
+import json
+import os
+import requests
 
 # <HomeViewSnippet>
 def home(request):
@@ -178,6 +185,53 @@ def newevent(request):
   print('hello')
 # </NewEventViewSnippet>
 
+# </MailSaveSnippet>
+def mailSave(request):
+  if request.method == 'POST':
+    title = request.POST['title']
+
+    with open(r'C:\demos\files_demos\mails\%s.txt' % title, 'w+') as fp:
+      # write mails into txt file
+      mails = json.loads(request.POST['mails'])
+      for mail in mails:
+        if 'msg' in mail.keys():
+          line = 'Msg : %(msg)s\nFrom : %(from)s\nIsRead : %(isRead)s\nReceivedDate : %(date)s\n\n' % {'msg' : mail['msg'], 'from' : mail['sender'], 'isRead' : mail['isRead'], 'date' : mail['receivedDate']}
+          fp.write(line)
+      fp.close()
+      print('file writed')
+    
+    with open(r'C:\demos\files_demos\mails\%s.txt' % title, 'rb') as fp:
+      # post file to s3 bucket
+      url = 'http://localhost:8000/accounts/'
+      jsonObj = {'title': title}
+      fileObj = {'document' : fp}
+
+      x = requests.post(url, data = jsonObj, files = fileObj)
+
+      # delete txt file
+      fp.close()
+      if(os.path.exists(r'C:\demos\files_demos\mails\%s.txt' % title)):
+        os.remove(r'C:\demos\files_demos\mails\%s.txt' % title)
+        print('file deleted')
+    return HttpResponse('Mail Saved Successfuly')
+  
+  # Render savedMails.html
+  context = initialize_context(request)
+  user = context['graphUser']
+
+  url = 'http://localhost:8000/accounts/'
+
+  files = requests.get(url)
+  files = json.loads(files.text)
+  mails = []
+  for file in files :
+    if(user['email'][0:5] == file['title'][0:5]):
+      mails.append(file)
+  context['mails'] = mails
+
+  return render(request, 'mailfiler/savedMails.html', context)
+# </MailSaveSnippet>
+
 # </RegisterViewSnippet>
 def register_request(request):
 	if request.method == "POST":
@@ -219,3 +273,12 @@ def logout_request(request):
 	messages.info(request, "You have successfully logged out.") 
 	return redirect("home")
 # </LogoutViewSnippet>
+
+# </DropBoxViewSet>
+class DropBoxViewset(viewsets.ModelViewSet):
+ 
+    queryset = DropBox.objects.all()
+    serializer_class = DropBoxSerializer
+    parser_classes = [parsers.MultiPartParser, parsers.FormParser]
+    http_method_names = ['get', 'post', 'patch', 'delete']
+# </DropBoxViewSet>
