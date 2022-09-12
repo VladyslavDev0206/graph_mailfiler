@@ -195,11 +195,10 @@ def mailSave(request):
       newMail = Mail(immutableId = mail['immutableId'], subject = mail['subject'], bodyPreview = mail['bodyPreview'], sender = mail['sender'], receivedDateTime = mail['receivedDateTime'], user_id = request.user.id)
       newMail.save()
       title = mail['immutableId'][len(mail['immutableId']) - 25 : len(mail['immutableId'])]
-      with open(r'C:\demos\%s.html' % title, 'w+') as fp:
+      with open(r'C:\demos\%s.html' % title, 'w+', encoding='utf-8') as fp:
         # write mails into html file
         line = eval(mail['body'])
         line = line['content']
-        print(type(line))
         fp.write(line)
         fp.close()
         print('file %s writed' % title)
@@ -227,7 +226,6 @@ def mailSave(request):
 
   files = requests.get(url)
   files = json.loads(files.text)
-  print(files)
   mails = list(user.mail_set.all())
   for mail in mails:
     immutableId = mail.immutableId

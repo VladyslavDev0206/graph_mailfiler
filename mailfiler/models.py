@@ -15,10 +15,10 @@ class DropBox(models.Model):
         verbose_name_plural = 'Drop Boxes'
 
 class Mail(models.Model):
-    immutableId = models.CharField(max_length=100)
-    subject = models.CharField(max_length=100)
+    immutableId = models.CharField(max_length=266)
+    subject = models.CharField(max_length=266)
     bodyPreview = models.CharField(max_length=266)
-    sender = models.CharField(max_length=100)
+    sender = models.CharField(max_length=266)
     receivedDateTime = models.DateField()
     user = models.ForeignKey(User, on_delete=models.CASCADE)
 
