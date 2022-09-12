@@ -27,7 +27,7 @@ def get_calendar_events(token, start, end, timezone):
   # Set headers
   headers = {
     'Authorization': 'Bearer {0}'.format(token),
-    'Prefer': 'outlook.timezone="{0}"'.format(timezone)
+    'Prefer': 'outlook.timezone="{0}" | IdType="ImmutableId"'.format(timezone)
   }
 
   # Configure query parameters to
@@ -55,12 +55,12 @@ def get_inbox(token, timezone):
   # Set headers
   headers = {
     'Authorization': 'Bearer {0}'.format(token),
-    'Prefer': 'outlook.timezone="{0}"'.format(timezone)
+    'Prefer': 'IdType="ImmutableId"'
   }
 
   endpoint = '/me/mailFolders/inbox/messages'
   # Only request specific properties
-  select = 'id,from,isRead,receivedDateTime,subject'
+  select = 'id,from,isRead,receivedDateTime,subject,body,bodyPreview,'
   # Get at most 25 results
   top = 25
   # Sort by received time, newest first

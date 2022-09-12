@@ -6,13 +6,14 @@ from django.contrib.auth import login, authenticate, logout
 from django.contrib import messages
 from datetime import datetime, timedelta
 from dateutil import tz, parser
-from mailfiler.auth_helper import get_sign_in_flow, get_token_from_code, store_user, remove_user_and_token, get_token
-from mailfiler.graph_helper import *
 from .forms import NewUserForm
 from django.contrib.auth.forms import AuthenticationForm 
 from rest_framework import viewsets, parsers
 from .models import DropBox
 from .serializers import DropBoxSerializer
+from mailfiler.auth_helper import get_sign_in_flow, get_token_from_code, store_user, remove_user_and_token, get_token
+from mailfiler.graph_helper import *
+from mailfiler.models import Mail
 import json
 import os
 import requests
@@ -188,45 +189,53 @@ def newevent(request):
 # </MailSaveSnippet>
 def mailSave(request):
   if request.method == 'POST':
-    title = request.POST['title']
+    mails = json.loads(request.POST['mails'])
 
-    with open(r'C:\demos\files_demos\mails\%s.txt' % title, 'w+') as fp:
-      # write mails into txt file
-      mails = json.loads(request.POST['mails'])
-      for mail in mails:
-        if 'msg' in mail.keys():
-          line = 'Msg : %(msg)s\nFrom : %(from)s\nIsRead : %(isRead)s\nReceivedDate : %(date)s\n\n' % {'msg' : mail['msg'], 'from' : mail['sender'], 'isRead' : mail['isRead'], 'date' : mail['receivedDate']}
-          fp.write(line)
-      fp.close()
-      print('file writed')
-    
-    with open(r'C:\demos\files_demos\mails\%s.txt' % title, 'rb') as fp:
-      # post file to s3 bucket
-      url = 'http://localhost:8000/accounts/'
-      jsonObj = {'title': title}
-      fileObj = {'document' : fp}
+    for mail in mails:
+      newMail = Mail(immutableId = mail['immutableId'], subject = mail['subject'], bodyPreview = mail['bodyPreview'], sender = mail['sender'], receivedDateTime = mail['receivedDateTime'], user_id = request.user.id)
+      newMail.save()
+      title = mail['immutableId'][len(mail['immutableId']) - 25 : len(mail['immutableId'])]
+      with open(r'C:\demos\%s.html' % title, 'w+') as fp:
+        # write mails into html file
+        line = eval(mail['body'])
+        line = line['content']
+        print(type(line))
+        fp.write(line)
+        fp.close()
+        print('file %s writed' % title)
+      
+      with open(r'C:\demos\%s.html' % title, 'rb') as fp:
+        # post file to s3 bucket
+        url = 'http://localhost:8000/accounts/'
+        jsonObj = {'title': title}
+        fileObj = {'document' : fp}
 
-      x = requests.post(url, data = jsonObj, files = fileObj)
+        x = requests.post(url, data = jsonObj, files = fileObj)
 
-      # delete txt file
-      fp.close()
-      if(os.path.exists(r'C:\demos\files_demos\mails\%s.txt' % title)):
-        os.remove(r'C:\demos\files_demos\mails\%s.txt' % title)
-        print('file deleted')
-    return HttpResponse('Mail Saved Successfuly')
+        # delete html file
+        fp.close()
+        if(os.path.exists(r'C:\demos\%s.html' % title)):
+          os.remove(r'C:\demos\%s.html' % title)
+          print('file deleted %s' % title)
+    return HttpResponse('Mails Saved Successfuly')
   
   # Render savedMails.html
   context = initialize_context(request)
-  user = context['graphUser']
+  user = request.user
 
   url = 'http://localhost:8000/accounts/'
 
   files = requests.get(url)
   files = json.loads(files.text)
-  mails = []
-  for file in files :
-    if(user['email'][0:5] == file['title'][0:5]):
-      mails.append(file)
+  print(files)
+  mails = list(user.mail_set.all())
+  for mail in mails:
+    immutableId = mail.immutableId
+    immutableId = immutableId[len(immutableId) - 25 : len(immutableId)]
+    filteredFile = list(filter(lambda file: file['title'] == immutableId, files))[0]
+    mail.url = filteredFile['document']
+    mail.immutableId = immutableId[len(immutableId) - 8 : len(immutableId)]
+
   context['mails'] = mails
 
   return render(request, 'mailfiler/savedMails.html', context)

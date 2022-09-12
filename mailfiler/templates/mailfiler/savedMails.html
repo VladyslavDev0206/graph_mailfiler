@@ -10,8 +10,11 @@
 <table class="table">
   <thead>
     <tr>
-      <!-- <th scope="col">Id</th> -->
-      <th scope="col">Title</th>
+      <th scope="col">Id</th>
+      <th scope="col">Subject</th>
+      <th scope="col">BodyPreview</th>
+      <th scope="col">From</th>
+      <th scope="col">ReceivedDateTime</th>
       <th scope="col">Url</th>
     </tr>
   </thead>
@@ -19,9 +22,12 @@
     {% if mails %}
       {% for mail in mails %}
         <tr>
-          <!-- <td>{{ mail.id }}</td> -->
-          <td>{{ mail.title }}</td>
-          <td><a href="{{ mail.document }}">click here</a></td>
+          <td>{{ mail.immutableId }}</td>
+          <td>{{ mail.subject }}</td>
+          <td>{{ mail.bodyPreview }}</td>
+          <td>{{ mail.sender }}</td>
+          <td>{{ mail.receivedDateTime }}</td>
+          <td><a href="{{ mail.url }}">click here</a></td>
         </tr>
       {% endfor %}
     {% endif %}
