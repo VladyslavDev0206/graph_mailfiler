@@ -27,3 +27,10 @@ class Mail(models.Model):
         mail = cls(immutableId=immutableId, subject=subject, bodyPreview=bodyPreview, sender=sender, receivedDateTime=receivedDateTime)
         # do something with the book
         return mail
+
+class Attachment(models.Model):
+    immutableId = models.CharField(max_length=266)
+    name = models.CharField(max_length=266)
+    contentType = models.CharField(max_length=266)
+    size = models.IntegerField()
+    mail = models.ForeignKey(Mail, on_delete=models.CASCADE)

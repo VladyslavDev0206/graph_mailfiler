@@ -9,13 +9,15 @@ from dateutil import tz, parser
 from .forms import NewUserForm
 from django.contrib.auth.forms import AuthenticationForm 
 from rest_framework import viewsets, parsers
-from .models import DropBox
 from .serializers import DropBoxSerializer
 from mailfiler.auth_helper import get_sign_in_flow, get_token_from_code, store_user, remove_user_and_token, get_token
 from mailfiler.graph_helper import *
+from .models import DropBox
 from mailfiler.models import Mail
+from mailfiler.models import Attachment
 import json
 import os
+import io
 import requests
 
 # <HomeViewSnippet>
@@ -68,7 +70,6 @@ def callback(request):
   result = get_token_from_code(request)
 
   #Get the user's profile
-  # print(result)
   user = get_user(result['access_token'])
 
   # Store user
@@ -133,14 +134,21 @@ def mail(request):
   mails = get_inbox(
     token,
     user['timeZone'])
-  if 'value' in mails:
-    # Convert the ISO 8601 date times to a datetime object
-    # This allows the Django template to format the value nicely
-    # for mail in mails['value']:
-      # event['start']['dateTime'] = parser.parse(event['start']['dateTime'])
-      # event['end']['dateTime'] = parser.parse(event['end']['dateTime'])
 
-    context['mails'] = mails['value']
+  # if response arrived successufuly
+  if 'value' in mails:
+    mails = mails['value']
+    # iterate mails and get attachment_list
+    for mail in mails:
+      attachment_list = get_attachment_list(
+        token,
+        mail['id'])
+      if 'value' in attachment_list:
+        attachment_list = attachment_list['value']
+        mail['attachment_list'] = attachment_list
+
+    context['mails'] = mails
+    context['jsonMails'] = json.dumps(mails)
 
   return render(request, 'mailfiler/inbox.html', context)
 # </MailViewSnippet>
@@ -192,16 +200,18 @@ def mailSave(request):
     mails = json.loads(request.POST['mails'])
 
     for mail in mails:
+      # Upload mail html file
       newMail = Mail(immutableId = mail['immutableId'], subject = mail['subject'], bodyPreview = mail['bodyPreview'], sender = mail['sender'], receivedDateTime = mail['receivedDateTime'], user_id = request.user.id)
+      # Save mail reference to database
       newMail.save()
       title = mail['immutableId'][len(mail['immutableId']) - 25 : len(mail['immutableId'])]
+      
       with open(r'C:\demos\%s.html' % title, 'w+', encoding='utf-8') as fp:
         # write mails into html file
         line = eval(mail['body'])
         line = line['content']
         fp.write(line)
         fp.close()
-        print('file %s writed' % title)
       
       with open(r'C:\demos\%s.html' % title, 'rb') as fp:
         # post file to s3 bucket
@@ -215,7 +225,39 @@ def mailSave(request):
         fp.close()
         if(os.path.exists(r'C:\demos\%s.html' % title)):
           os.remove(r'C:\demos\%s.html' % title)
-          print('file deleted %s' % title)
+
+      # Upload attachment files
+      if 'attachments' in mail:
+        for attach in mail['attachments']:
+          newAttach = Attachment(immutableId = attach['id'], name = attach['name'], contentType = attach['contentType'], size= attach['size'], mail_id = newMail.id)
+          newAttach.save()
+          title = attach['id']
+          title = title[len(title) - 25 : len(title)]
+          typeStr = attach["name"][len(attach["name"]) - 4:len(attach["name"])]
+          attach['name'] = attach['name'][0 : (21, len(attach['name']) - 4)[len(attach['name']) - 4 < 21]]
+          attach['name'] = f'{attach["name"]}{typeStr}'
+          token = get_token(request)
+          attach_raw_content = get_attachment_raw_content(token, mail['immutableId'], attach['id'])
+          toread = io.BytesIO()
+          toread.write(attach_raw_content)
+          with open(r'C:\demos\%s' % attach['name'], 'wb') as fp:
+            # write attachment files
+            fp.write(toread.getbuffer())
+            fp.close()
+          
+          with open(r'C:\demos\%s' % attach['name'], 'rb') as fp:
+            # post attachment file to s3 bucket
+            url = 'http://localhost:8000/accounts/'
+            jsonObj = {'title': title}
+            fileObj = {'document' : fp}
+
+            x = requests.post(url, data = jsonObj, files = fileObj)
+
+            # delete attachment file
+            fp.close()
+            if(os.path.exists(r'C:\demos\%s' % attach['name'])):
+              os.remove(r'C:\demos\%s' % attach['name'])
+
     return HttpResponse('Mails Saved Successfuly')
   
   # Render savedMails.html
@@ -227,14 +269,41 @@ def mailSave(request):
   files = requests.get(url)
   files = json.loads(files.text)
   mails = list(user.mail_set.all())
+  dictMails = []
   for mail in mails:
     immutableId = mail.immutableId
     immutableId = immutableId[len(immutableId) - 25 : len(immutableId)]
     filteredFile = list(filter(lambda file: file['title'] == immutableId, files))[0]
     mail.url = filteredFile['document']
     mail.immutableId = immutableId[len(immutableId) - 8 : len(immutableId)]
+    attachments = mail.attachment_set.all()
+    mail.attachments = attachments
+    dictAttachments = []
+    for attachment in attachments:
+      immutableId = attachment.immutableId[len(attachment.immutableId) - 25 : len(attachment.immutableId)]
+      filteredFile = list(filter(lambda file: file['title'] == immutableId, files))
+      filteredFile = ([], filteredFile[0])[len(filteredFile)]
+      attachment.url = filteredFile['document']
+      dictAttachments.append({
+        'immutableId' : attachment.immutableId,
+        'name' : attachment.name,
+        'contentType' : attachment.contentType,
+        'size' : attachment.size,
+        'url' : attachment.url
+      })
+    mail = {
+      'bodyPreview' : mail.bodyPreview,
+      'subject' : mail.subject,
+      'sender' : mail.sender,
+      'receivedDateTime' : mail.receivedDateTime.strftime("%m/%d/%Y, %H:%M:%S"),
+      'immutableId' : mail.immutableId,
+      'url' : mail.url,
+      'attachments' : dictAttachments
+    }
+    dictMails.append(mail)
 
   context['mails'] = mails
+  context['jsonMails'] = json.dumps(dictMails)
 
   return render(request, 'mailfiler/savedMails.html', context)
 # </MailSaveSnippet>

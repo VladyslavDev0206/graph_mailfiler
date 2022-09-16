@@ -14,10 +14,12 @@
       <th scope="col" style="display:none">Id</th>
       <th scope="col">Subject</th>
       <th scope="col" style="display:none">body</th>
-      <th scope="col">Body</th>
+      <th scope="col" style="display:none">BodyPreview</th>
       <th scope="col">From</th>
-      <th scope="col">Read</th>
+      <th scope="col" style="display:none">Read</th>
       <th scope="col">Received</th>
+      <th scope="col">Attachments<br><input onclick='saveAllAttachments()' type="checkbox" id="saveAllAttachments"></th>
+      <th>Save<br><input onclick='saveAll()' id='saveAll' type='checkbox'></th>
     </tr>
   </thead>
   <tbody>
@@ -27,36 +29,57 @@
           <td style="display:none">{{ mail.id }}</td>
           <td>{{ mail.subject }}</td>
           <td style="display:none">{{ mail.body }}</td>
-          <td>{{ mail.bodyPreview }}...</td>
+          <td style="display:none">{{ mail.bodyPreview }}...</td>
           <td>{{ mail.from.emailAddress.name }}</td>
-          <td>{{ mail.isRead }}</td>
-          <td>{{ mail.receivedDateTime }}</td>
-        </tr>
+          <td style="display:none">{{ mail.isRead }}</td>
+          <td >{{ mail.receivedDateTime }}</td>
+          {% if mail.attachment_list|length > 0 %}
+          <td><input onclick="showAttaches('{{mail.id}}')" type='button' class="secondary" value="See">&nbsp;&nbsp;<input class='checkAttach' type="checkbox"></td>
+          {% else %}
+          <td></td>
+          {% endif %}
+          <td><input class='checkMail' type='checkbox'></td>
+          </tr>
       {% endfor %}
     {% endif %}
   </tbody>
 </table>
+<dialog id="favDialog">
+  <table id="attachTable">
+  </table>
+  <button id="cancel" type="reset">Cancel</button>
+</dialog>
 {% endblock %}
 {% block script %}
 <script>
+  let contextMails = JSON.parse('{{ jsonMails|escapejs }}')
+
   function saveMails(){
-    let fields = ['immutableId', 'subject', 'body', 'bodyPreview', 'sender', 'isRead', 'receivedDateTime'];
+    let fields = ['immutableId', 'subject', 'body', 'bodyPreview', 'sender', 'isRead', 'receivedDateTime', 'checkedAttach','checked'];
     let mails = [];
-    $( "tr" ).each(function( index ) {
-      if(index > 0){
+    $( "tr" ).each(function( trIndex ) {
+      if(trIndex > 0){
         let mail = {}
         $( this ).children('td').each(function(index){
           let value = $(this).text()
-          if(fields[index] == 'receivedDateTime'){
+          // change the date to specified form
+          if(fields[index] == 'receivedDateTime')
             mail[fields[index]] = formatDate(new Date(value))
-            console.log(mail[fields[index]])
+          else if(fields[index] == 'checked'){
+            mail[fields[index]] = $($(this).children()[0]).prop('checked')
+          }
+          else if(fields[index] == 'checkedAttach'){
+            mail[fields[index]] = $($(this).children()[1]).prop('checked')
+            if(mail[fields[index]] == true){
+              mail['attachments'] = contextMails[trIndex - 1].attachment_list
+            }
           }
           else  mail[fields[index]] = value
         })
-        mails.push(mail)
+        if(mail['checked'] == true)
+          mails.push(mail)
       }
     });
-    
     mails = JSON.stringify(mails)
     title = $('p[name="email"]').text()
     title = (title.split('@')[0]).slice(0, 5)
@@ -71,6 +94,7 @@
       alert('Mail Saved Successfuly')
     });
   }
+
   // add csrf token
   let csrfField = $('input[name="csrfmiddlewaretoken"]')[0]
   $.ajaxSetup({
@@ -78,6 +102,29 @@
           'X-CSRFToken': $(csrfField).val()
       }
   });
+
+  var cancelButton = document.getElementById('cancel')
+  var favDialog = document.getElementById('favDialog')
+
+  // show the modal dialog
+  function showAttaches(id){
+    let mail = contextMails.filter(function(mail){return id == mail.id})
+    let attaches = mail[0].attachment_list
+    $('#attachTable').text("")
+    $('#attachTable').append('<tr><th>id</th><th>name</th><th>contentType</th><th>size</th></tr>')
+    attaches.forEach(attach => {
+      $('#attachTable').append('<tr><td>' + attach.id.substring(0, 10) + '</td><td>' + attach.name  + '</td><td>' + attach.contentType + '</td><td>' + attach.size + '</td></tr>')
+    })
+
+    favDialog.showModal()
+  }
+
+  // Form cancel button closes the dialog box
+  cancelButton.addEventListener('click', function() {
+    favDialog.close()
+  });
+
+  // Format date function
   function formatDate(date) {
     var d = date,
         month = '' + (d.getMonth() + 1),
@@ -91,7 +138,7 @@
 
     return [year, month, day].join('-');
   }
-  // Format date function
+  // Format date function1
   function formatDate1(date) {
     var d = date,
     month = '' + (d.getMonth() + 1),
@@ -114,6 +161,20 @@
         second = '0' + second;
 
     return [year.slice(2,4), month, day].join('') + '_' + [hour, minute, second].join('');
+  }
+  // check all
+  function saveAll(){
+    let checkAllInput = $('#saveAll')
+    let ischecked = checkAllInput.prop('checked')
+    let allInputs = $('input.checkMail')
+    allInputs.prop('checked', ischecked)
+  }
+  // check all Attach
+  function saveAllAttachments(){
+    let checkAllInput = $('#saveAllAttachments')
+    let ischecked = checkAllInput.prop('checked')
+    let allInputs = $('input.checkAttach')
+    allInputs.prop('checked', ischecked)
   }
 </script>
 {% endblock %}

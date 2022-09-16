@@ -72,6 +72,45 @@ def get_inbox(token, timezone):
   return inbox_response.json()
 # </GetInboxSnippet>
 
+# </GetAttachmentListSnippet>
+def get_attachment_list(token, id):
+  # Set headers
+  headers = {
+    'Authorization': 'Bearer {0}'.format(token),
+    'Prefer': 'IdType="ImmutableId"'
+  }
+  
+  endpoint = '/me/messages/%s/attachments' % id
+  # Only request specific properties
+  select = 'contentType, id, isInline, lastModifiedDateTime, name, size'
+  # Get at most 25 results
+  top = 25
+  # Sort by received time, newest first
+  order_by = 'lastModifiedDateTime DESC'
+  request_url = f'{graph_url}{endpoint}?$select={select}&$top={top}&$orderBy={order_by}'
+
+  attachment_list_response = requests.get(request_url,
+    headers=headers)
+  return attachment_list_response.json()
+
+# </GetAttachmentListSnippet>
+
+# </GetAttachmentRawContent>
+def get_attachment_raw_content(token, mailId, attachId):
+  # Set headers
+  headers = {
+    'Authorization': 'Bearer {0}'.format(token),
+    'Prefer': 'IdType="ImmutableId"'
+  }
+  
+  endpoint = '/me/messages/%s/attachments/%s/$value' % (mailId, attachId)
+  request_url = f'{graph_url}{endpoint}'
+
+  attachment_raw_content = requests.get(request_url,
+    headers=headers)
+  return attachment_raw_content.content
+# </GetAttachmentRawContent>
+
 # <CreateEventSnippet>
 def create_event(token, subject, start, end, attendees=None, body=None, timezone='UTC'):
   # Create an event object

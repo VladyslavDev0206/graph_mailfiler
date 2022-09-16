@@ -15,6 +15,7 @@
       <th scope="col">BodyPreview</th>
       <th scope="col">From</th>
       <th scope="col">ReceivedDateTime</th>
+      <th scope="col">Attachments</th>
       <th scope="col">Url</th>
     </tr>
   </thead>
@@ -27,76 +28,47 @@
           <td>{{ mail.bodyPreview }}</td>
           <td>{{ mail.sender }}</td>
           <td>{{ mail.receivedDateTime }}</td>
+          {% if mail.attachments|length > 0 %}
+          <td><input onclick="showAttaches('{{mail.immutableId}}')" type='button' class="secondary" value="See"></td>
+          {% else %}
+          <td></td>
+          {% endif %}
           <td><a href="{{ mail.url }}">click here</a></td>
         </tr>
       {% endfor %}
     {% endif %}
   </tbody>
 </table>
+<dialog id="favDialog">
+  <table id="attachTable">
+  </table>
+  <button id="cancel" type="reset">Cancel</button>
+</dialog>
 {% endblock %}
 {% block script %}
 <script>
-  function saveMails(){
-    let fields = ['msg', 'sender', 'isRead', 'receivedDate'];
-    let mails = [];
-    $( "tr" ).each(function( index ) {
-      if(index > 0){
-        let mail = {}
-        $( this ).children('td').each(function(index){
-          let value = $(this).text()
-          mail[fields[index]] = value;
-        })
-        mails.push(mail)
-      }
-    });
-    
-    mails = JSON.stringify(mails)
-    title = $('p[name="email"]').text()
-    title = (title.split('@')[0]).slice(0, 5)
-    title += '_' + formatDate(new Date(Date.now()))
-    console.log(title)
+  let contextMails = JSON.parse('{{ jsonMails|escapejs }}')
+  console.log(contextMails)
+  var cancelButton = document.getElementById('cancel')
+  var favDialog = document.getElementById('favDialog')
 
-    $.post("mail/save",
-    {
-      mails : mails,
-      title : title
-    },
-    function(data, status){
-      if(data == 'success')
-        alert('saved successufuly')
-    });
+  // show the modal dialog
+  function showAttaches(id){
+    let mail = contextMails.filter(function(mail){return id == mail.immutableId})
+    let attaches = mail[0].attachments
+    $('#attachTable').text("")
+    $('#attachTable').append('<tr><th>id</th><th>name</th><th>contentType</th><th>size</th><th>URL</th></tr>')
+    attaches.forEach(attach => {
+      $('#attachTable').append('<tr><td>' + attach.immutableId.substring(0, 10) + '</td><td>' + attach.name  + '</td><td>' + attach.contentType + '</td><td>' + attach.size + '</td><td><a href="' + attach.url + '">Click here</a></td></tr>')
+    })
+
+    favDialog.showModal()
   }
-  // add csrf token
-  let csrfField = $('input[name="csrfmiddlewaretoken"]')[0]
-  $.ajaxSetup({
-      headers: {
-          'X-CSRFToken': $(csrfField).val()
-      }
+
+  // Form cancel button closes the dialog box
+  cancelButton.addEventListener('click', function() {
+    favDialog.close()
   });
-  // Format date function
-  function formatDate(date) {
-    var d = date,
-    month = '' + (d.getMonth() + 1),
-    day = '' + d.getDate(),
-    year = '' + d.getFullYear();
-
-    if (month.length < 2) 
-        month = '0' + month;
-    if (day.length < 2) 
-        day = '0' + day;
-
-    hour = '' + d.getHours(),
-    minute = '' + d.getMinutes()
-    second = '' + d.getSeconds()
-    if (hour.length < 2) 
-        hour = '0' + hour;
-    if (minute.length < 2) 
-        minute = '0' + minute;
-    if (second.length < 2) 
-        second = '0' + second;
-
-    return [year.slice(2,4), month, day].join('') + '_' + [hour, minute, second].join('');
-  }
 </script>
 {% endblock %}
 <!-- </CalendarSnippet> -->
