@@ -4,8 +4,7 @@
 <!-- <CalendarSnippet> -->
 {% extends "mailfiler/layout.html" %}
 {% block content %}
-<a href="{% url 'saveMail' %}" class="btn btn-primary">Saved Mails</a>
-<button class="btn btn-success float-right" onclick="saveMails()">Save</button>
+<button class="btn btn-success float-right m-2" onclick="saveMails()">Download</button>
 <!-- <a href="/calendar/new" class="btn btn-light btn-sm mb-3">New event</a> -->
 {% csrf_token %}
 <table class="table">
@@ -167,6 +166,8 @@
     let checkAllInput = $('#saveAll')
     let ischecked = checkAllInput.prop('checked')
     let allInputs = $('input.checkMail')
+    allInputs.prop('checked', ischecked)
+    allInputs = $('input.checkAttach')
     allInputs.prop('checked', ischecked)
   }
   // check all Attach

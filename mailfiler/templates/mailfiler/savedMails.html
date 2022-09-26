@@ -4,7 +4,7 @@
 <!-- <CalendarSnippet> -->
 {% extends "mailfiler/layout.html" %}
 {% block content %}
-<h1>Saved Mails on S3 Bucket</h1>
+<a href="{% url 'mail' %}" class="btn btn-primary m-2">Download Mails</a>
 <!-- <a href="/calendar/new" class="btn btn-light btn-sm mb-3">New event</a> -->
 {% csrf_token %}
 <table class="table">

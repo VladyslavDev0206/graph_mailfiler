@@ -31,7 +31,7 @@
             {% if user.is_authenticated %}
             {% if graphUser.is_authenticated %}
               <li class="nav-item" data-turbolinks="false">
-                <a class="nav-link{% if request.resolver_match.view_name == 'mail' %} active{% endif %}" href="{% url 'mail' %}">Mail</a>
+                <a class="nav-link{% if request.resolver_match.view_name == 'saveMail' %} active{% endif %}" href="{% url 'saveMail' %}">Inbox</a>
               </li>
             {% endif %}
             {% endif %}
