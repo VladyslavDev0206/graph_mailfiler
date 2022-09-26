@@ -1,3 +1,4 @@
+from urllib import response
 from urllib.request import url2pathname
 from django.shortcuts import render, redirect
 from django.http import HttpResponse, HttpResponseRedirect
@@ -19,6 +20,11 @@ import json
 import os
 import io
 import requests
+import yaml
+
+# Load the oauth_settings.yml file
+stream = open('oauth_settings.yml', 'r')
+settings = yaml.load(stream, yaml.SafeLoader)
 
 # <HomeViewSnippet>
 def home(request):
@@ -131,6 +137,14 @@ def mail(request):
 
   token = get_token(request)
 
+  schema_extension = is_schema_extension_defined(token, settings['schema_id'])
+  if('value' in schema_extension):
+    print(schema_extension['value'])
+  else:
+    print(schema_extension)
+    # response = define_schema_extension(token)
+    # print(response.text)
+
   mails = get_inbox(
     token,
     user['timeZone'])
@@ -139,7 +153,12 @@ def mail(request):
   if 'value' in mails:
     mails = mails['value']
     # iterate mails and get attachment_list
-    for mail in mails:
+    for idx, mail in enumerate(mails):
+      # check if the mail is already downloaded
+      if(settings['schema_id'] in get_schema_extension(token, mail['id'], settings['schema_id'])):
+        del mails[idx]
+        continue
+      # fetch attachments
       attachment_list = get_attachment_list(
         token,
         mail['id'])
@@ -198,6 +217,7 @@ def newevent(request):
 def mailSave(request):
   if request.method == 'POST':
     mails = json.loads(request.POST['mails'])
+    token = get_token(request)
 
     for mail in mails:
       # Upload mail html file
@@ -220,6 +240,7 @@ def mailSave(request):
         fileObj = {'document' : fp}
 
         x = requests.post(url, data = jsonObj, files = fileObj)
+        add_schema_extension(token, mail['immutableId'], settings['schema_id'])
 
         # delete html file
         fp.close()
@@ -236,7 +257,6 @@ def mailSave(request):
           typeStr = attach["name"][len(attach["name"]) - 4:len(attach["name"])]
           attach['name'] = attach['name'][0 : (21, len(attach['name']) - 4)[len(attach['name']) - 4 < 21]]
           attach['name'] = f'{attach["name"]}{typeStr}'
-          token = get_token(request)
           attach_raw_content = get_attachment_raw_content(token, mail['immutableId'], attach['id'])
           toread = io.BytesIO()
           toread.write(attach_raw_content)
@@ -358,3 +378,10 @@ class DropBoxViewset(viewsets.ModelViewSet):
     parser_classes = [parsers.MultiPartParser, parsers.FormParser]
     http_method_names = ['get', 'post', 'patch', 'delete']
 # </DropBoxViewSet>
+
+# </Notify>
+def notify(request):
+  print('validation request arrived')
+  if(request.method == 'POST'):
+    print(request.POST)
+# </Notify>

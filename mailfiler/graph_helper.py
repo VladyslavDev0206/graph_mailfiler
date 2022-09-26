@@ -2,9 +2,16 @@
 # Licensed under the MIT License.
 
 # <FirstCodeSnippet>
+from urllib import request
+from wsgiref.util import request_uri
+import yaml
 from email import header
 import requests
 import json
+
+# Load the oauth_settings.yml file
+stream = open('oauth_settings.yml', 'r')
+settings = yaml.load(stream, yaml.SafeLoader)
 
 graph_url = 'https://graph.microsoft.com/v1.0'
 
@@ -110,6 +117,95 @@ def get_attachment_raw_content(token, mailId, attachId):
     headers=headers)
   return attachment_raw_content.content
 # </GetAttachmentRawContent>
+
+# </GetSchemaExtensions>
+def is_schema_extension_defined(token, schema_id):
+  # Set headers
+  headers = {
+    'Authorization': 'Bearer {0}'.format(token)
+  }
+
+  endpoint = "/schemaExtensions?$filter=id eq '%s'" % schema_id
+  request_url = f'{graph_url}{endpoint}'
+
+  schema_extension = requests.get(request_url,
+  headers=headers)
+
+  return schema_extension.json()
+# </GetSchemaExtensions>
+
+# </DefineSchemaExtension>
+def define_schema_extension(token):
+  # Set headers
+  headers = {
+    'Authorization': 'Bearer {0}'.format(token),
+    'Content-Type' : 'application/json'
+  }
+
+  endpoint = "/schemaExtensions"
+  request_url = f'{graph_url}{endpoint}'
+  new_schema_extension = {
+    'id' : 'mailfiler',
+    'description' : 'Mailfiler defined this extension for filtering mails',
+    'targetTypes' : [
+      'message'
+    ],
+    'owner' : settings['app_id'],
+    'properties' : [
+      {
+        'name' : 'lostatus',
+        'type' : 'String'
+      }
+    ]
+  }
+
+  response = requests.post(request_url,
+  headers=headers,
+  data=json.dumps(new_schema_extension))
+
+  return response
+# </DefineSchemaExtension>
+
+# </AddSchemaExtension>
+def add_schema_extension(token, mailId, schema_id):
+  # Set headers
+  headers = {
+    'Authorization': 'Bearer {0}'.format(token),
+    'Content-Type': 'application/json'
+  }
+
+  endpoint = "/me/messages/%s" % mailId
+  request_url = f'{graph_url}{endpoint}'
+
+  schema_data = {
+    '%s' % schema_id : {
+      'lostatus' : 'Mail Saved'
+    }
+  }
+
+  response = requests.patch(request_url,
+  headers=headers,
+  data=json.dumps(schema_data))
+
+  print(response.text)
+# </AddSchemaExtension>
+
+# </GetSchemaExtensionSnippet>
+def get_schema_extension(token, mailId, schema_id):
+  # Set headers
+  headers = {
+    'Authorization': 'Bearer {0}'.format(token),
+    'Content-Type': 'application/json'
+  }
+
+  endpoint = '/me/messages/%s?$select=%s' % (mailId, schema_id)
+  request_url = f'{graph_url}{endpoint}'
+
+  response = requests.get(request_url,
+  headers=headers)
+
+  return response.json()
+# </GetSchemaExtensionSnippet>
 
 # <CreateEventSnippet>
 def create_event(token, subject, start, end, attendees=None, body=None, timezone='UTC'):
