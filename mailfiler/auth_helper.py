@@ -6,6 +6,9 @@ import yaml
 import msal
 import os
 import time
+import json
+from .models import GraphUser
+from .models import Connect
 
 # Load the oauth_settings.yml file
 stream = open('oauth_settings.yml', 'r')
@@ -16,12 +19,20 @@ def load_cache(request):
   cache = msal.SerializableTokenCache()
   if request.session.get('token_cache'):
     cache.deserialize(request.session['token_cache'])
-
   return cache
 
 def save_cache(request, cache):
   # If cache has changed, persist back to session
-  if cache.has_state_changed:
+  if cache.has_state_changed: 
+    access_token = json.loads(cache.serialize())['AccessToken']
+    graph_user_id = list(access_token.keys())[0].split('.')[0]
+    graphUser = GraphUser.objects.get(graph_user_id=graph_user_id)
+    if(Connect.objects.filter(user_id=graphUser.id).exists()):
+      connect = Connect.objects.get(user_id=graphUser.id)
+      connect.token_cache = cache.serialize()
+    else:
+      new_connect = Connect(token_cache=cache.serialize(), user_id=graphUser.id, microsoft_user_id=graph_user_id)
+      new_connect.save()
     request.session['token_cache'] = cache.serialize()
 
 def get_msal_app(cache=None):
@@ -37,7 +48,7 @@ def get_msal_app(cache=None):
 # Method to generate a sign-in flow
 def get_sign_in_flow():
   auth_app = get_msal_app()
-  
+
   return auth_app.initiate_auth_code_flow(
     settings['scopes'],
     redirect_uri=settings['redirect'])
@@ -59,8 +70,15 @@ def get_token_from_code(request):
 # <SecondCodeSnippet>
 def store_user(request, user):
   try:
+    id = user['id'].split('@')[0]
+    if(GraphUser.objects.filter(graph_user_id=id).exists()):
+      print('exist')
+    else:
+      new_graph_user = GraphUser(graph_user_id=id, name=user['displayName'], email=user['mail'] if (user['mail'] != None) else user['userPrincipalName'], timezone=user['mailboxSettings']['timeZone'] if ('timeZone' in user['mailboxSettings']) else 'UTC')
+      new_graph_user.save()
     request.session['graphUser'] = {
-      'is_authenticated': True,
+      'is_authenticated': True, 
+      'graph_user_id': id,
       'name': user['displayName'],
       'email': user['mail'] if (user['mail'] != None) else user['userPrincipalName'],
       'timeZone': user['mailboxSettings']['timeZone'] if ('timeZone' in user['mailboxSettings']) else 'UTC'
@@ -79,6 +97,24 @@ def get_token(request):
       account=accounts[0])
 
     save_cache(request, cache)
+
+    return result['access_token']
+
+def get_token_with_graph_user(graph_user_id):
+  connect = Connect.objects.get(microsoft_user_id=graph_user_id)
+  token_cache = connect.token_cache
+  cache = msal.SerializableTokenCache()
+  cache.deserialize(token_cache)
+  auth_app = get_msal_app(cache)
+
+  accounts = auth_app.get_accounts()
+  if accounts:
+    result = auth_app.acquire_token_silent(
+      settings['scopes'],
+      account=accounts[0])
+
+    connect.token_cache = cache.serialize()
+    connect.save()
 
     return result['access_token']
 

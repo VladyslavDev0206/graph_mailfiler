@@ -64,10 +64,11 @@ def get_inbox(token, timezone):
     'Authorization': 'Bearer {0}'.format(token),
     'Prefer': 'IdType="ImmutableId"'
   }
+  print('token', token)
 
   endpoint = '/me/mailFolders/inbox/messages'
   # Only request specific properties
-  select = 'id,from,isRead,receivedDateTime,subject,body,bodyPreview,'
+  select = 'id,from,isRead,receivedDateTime,subject,body,bodyPreview'
   # Get at most 25 results
   top = 25
   # Sort by received time, newest first
@@ -78,6 +79,22 @@ def get_inbox(token, timezone):
     headers=headers)
   return inbox_response.json()
 # </GetInboxSnippet>
+
+# </GetMessageSnippet>
+def get_message(token, endpoint):
+  # Set headers
+  headers = {
+    'Authorization': 'Bearer {0}'.format(token),
+    'Prefer': 'IdType="ImmutableId"'
+  }
+  # Only request specific properties
+  select = 'id,from,isRead,receivedDateTime,subject,body,bodyPreview'
+  request_url = f'{graph_url}/{endpoint}?$select={select}'
+
+  message_response = requests.get(request_url,
+  headers=headers)
+  return message_response.json()
+# </GetMessageSnippet>
 
 # </GetAttachmentListSnippet>
 def get_attachment_list(token, id):

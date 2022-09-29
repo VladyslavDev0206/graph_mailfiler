@@ -14,13 +14,19 @@ class DropBox(models.Model):
     class Meta:
         verbose_name_plural = 'Drop Boxes'
 
+class GraphUser(models.Model):
+    graph_user_id = models.CharField(max_length=100)
+    name = models.CharField(max_length=100)
+    email = models.CharField(max_length=100)
+    timezone = models.CharField(max_length=100)
+
 class Mail(models.Model):
     immutableId = models.CharField(max_length=266)
     subject = models.CharField(max_length=266)
     bodyPreview = models.CharField(max_length=266)
     sender = models.CharField(max_length=266)
     receivedDateTime = models.DateField()
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    user = models.ForeignKey(GraphUser, on_delete=models.CASCADE)
 
     @classmethod
     def create(cls, immutableId, subject, bodyPreview, sender, receivedDateTime):
@@ -34,3 +40,8 @@ class Attachment(models.Model):
     contentType = models.CharField(max_length=266)
     size = models.IntegerField()
     mail = models.ForeignKey(Mail, on_delete=models.CASCADE)
+
+class Connect(models.Model):
+    token_cache = models.CharField(max_length=13000)
+    microsoft_user_id = models.CharField(max_length=50)
+    user = models.ForeignKey(GraphUser, on_delete=models.CASCADE)

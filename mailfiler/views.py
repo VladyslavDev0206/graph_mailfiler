@@ -5,15 +5,17 @@ from django.http import HttpResponse, HttpResponseRedirect
 from django.urls import reverse
 from django.contrib.auth import login, authenticate, logout
 from django.contrib import messages
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from dateutil import tz, parser
 from .forms import NewUserForm
 from django.contrib.auth.forms import AuthenticationForm 
+from django.views.decorators.csrf import csrf_exempt
 from rest_framework import viewsets, parsers
 from .serializers import DropBoxSerializer
-from mailfiler.auth_helper import get_sign_in_flow, get_token_from_code, store_user, remove_user_and_token, get_token
+from mailfiler.auth_helper import get_sign_in_flow, get_token_from_code, store_user, remove_user_and_token, get_token, get_token_with_graph_user
 from mailfiler.graph_helper import *
 from .models import DropBox
+from .models import GraphUser
 from mailfiler.models import Mail
 from mailfiler.models import Attachment
 import json
@@ -27,7 +29,94 @@ stream = open('oauth_settings.yml', 'r')
 settings = yaml.load(stream, yaml.SafeLoader)
 
 # <HomeViewSnippet>
+@csrf_exempt
 def home(request):
+  if(request.method == "POST"):
+    validationToken = request.get_full_path().split('=')
+    # If valdationToken for subscription arrives return it back
+    if(len(validationToken) > 1):
+      validationToken = validationToken[1].replace('%3a', ':')
+      validationToken = validationToken.replace('+', ' ')
+      return HttpResponse(validationToken, 'text/plain')
+    else :
+      # If notification of new message arrives
+      data = json.loads(request.body)
+      if('value' in data):
+        for subscription in data['value']:
+          graph_user_id = subscription['resource'].split('/')[1]
+          graphUser = GraphUser.objects.get(graph_user_id=graph_user_id)
+          token = get_token_with_graph_user(graph_user_id)
+          mail = get_message(token, subscription['resource'])
+          date = mail['receivedDateTime']
+          date = parser.isoparse(date)
+          print(date)
+          if(settings['schema_id'] in get_schema_extension(token, mail['id'], settings['schema_id'])):
+            return HttpResponse('mail already downloaded', 'text/plain')
+          ### save mail ###
+          # Upload mail html file
+          newMail = Mail(immutableId = mail['id'], subject = mail['subject'], bodyPreview = mail['bodyPreview'], sender = mail['from']['emailAddress']['name'], receivedDateTime = date, user_id = graphUser.id)
+          # Save mail reference to database
+          newMail.save()
+          title = mail['id'][len(mail['id']) - 25 : len(mail['id'])]
+          
+          with open(r'C:\demos\%s.html' % title, 'w+', encoding='utf-8') as fp:
+            # write mails into html file
+            line = mail['body']
+            line = line['content']
+            fp.write(line)
+            fp.close()
+          
+          with open(r'C:\demos\%s.html' % title, 'rb') as fp:
+            # post file to s3 bucket
+            url = 'http://localhost:8000/accounts/'
+            jsonObj = {'title': title}
+            fileObj = {'document' : fp}
+
+            x = requests.post(url, data = jsonObj, files = fileObj)
+            add_schema_extension(token, mail['id'], settings['schema_id'])
+
+            # delete html file
+            fp.close()
+            if(os.path.exists(r'C:\demos\%s.html' % title)):
+              os.remove(r'C:\demos\%s.html' % title)
+
+          # Upload attachment files
+          attachment_list = get_attachment_list(
+            token,
+            mail['id'])
+          if 'value' in attachment_list:
+            attachment_list = attachment_list['value']
+            for attach in attachment_list:
+              newAttach = Attachment(immutableId = attach['id'], name = attach['name'], contentType = attach['contentType'], size= attach['size'], mail_id = newMail.id)
+              newAttach.save()
+              title = attach['id']
+              title = title[len(title) - 25 : len(title)]
+              typeStr = attach["name"][len(attach["name"]) - 4:len(attach["name"])]
+              attach['name'] = attach['name'][0 : (21, len(attach['name']) - 4)[len(attach['name']) - 4 < 21]]
+              attach['name'] = f'{attach["name"]}{typeStr}'
+              attach_raw_content = get_attachment_raw_content(token, mail['id'], attach['id'])
+              toread = io.BytesIO()
+              toread.write(attach_raw_content)
+              with open(r'C:\demos\%s' % attach['name'], 'wb') as fp:
+                # write attachment files
+                fp.write(toread.getbuffer())
+                fp.close()
+              
+              with open(r'C:\demos\%s' % attach['name'], 'rb') as fp:
+                # post attachment file to s3 bucket
+                url = 'http://localhost:8000/accounts/'
+                jsonObj = {'title': title}
+                fileObj = {'document' : fp}
+
+                x = requests.post(url, data = jsonObj, files = fileObj)
+                print('attachresponse', x.text)
+                # delete attachment file
+                fp.close()
+                if(os.path.exists(r'C:\demos\%s' % attach['name'])):
+                  os.remove(r'C:\demos\%s' % attach['name'])
+          
+          return HttpResponse('mail downloaded', 'text/plain')
+
   context = initialize_context(request)
 
   return render(request, 'mailfiler/home.html', context)
@@ -151,12 +240,13 @@ def mail(request):
 
   # if response arrived successufuly
   if 'value' in mails:
+    downloaded_mail_idx = []
     mails = mails['value']
     # iterate mails and get attachment_list
     for idx, mail in enumerate(mails):
       # check if the mail is already downloaded
       if(settings['schema_id'] in get_schema_extension(token, mail['id'], settings['schema_id'])):
-        del mails[idx]
+        downloaded_mail_idx.append(idx)
         continue
       # fetch attachments
       attachment_list = get_attachment_list(
@@ -165,6 +255,11 @@ def mail(request):
       if 'value' in attachment_list:
         attachment_list = attachment_list['value']
         mail['attachment_list'] = attachment_list
+    # del downloaded mails
+    offset = 0
+    for idx in downloaded_mail_idx:
+      del mails[idx - offset]
+      offset += 1
 
     context['mails'] = mails
     context['jsonMails'] = json.dumps(mails)
@@ -215,13 +310,14 @@ def newevent(request):
 
 # </MailSaveSnippet>
 def mailSave(request):
+  graphUser = GraphUser.objects.get(graph_user_id=request.session.get('graphUser')['graph_user_id'])
   if request.method == 'POST':
     mails = json.loads(request.POST['mails'])
     token = get_token(request)
 
     for mail in mails:
       # Upload mail html file
-      newMail = Mail(immutableId = mail['immutableId'], subject = mail['subject'], bodyPreview = mail['bodyPreview'], sender = mail['sender'], receivedDateTime = mail['receivedDateTime'], user_id = request.user.id)
+      newMail = Mail(immutableId = mail['immutableId'], subject = mail['subject'], bodyPreview = mail['bodyPreview'], sender = mail['sender'], receivedDateTime = mail['receivedDateTime'], user_id = graphUser.id)
       # Save mail reference to database
       newMail.save()
       title = mail['immutableId'][len(mail['immutableId']) - 25 : len(mail['immutableId'])]
@@ -282,14 +378,17 @@ def mailSave(request):
   
   # Render savedMails.html
   context = initialize_context(request)
-  user = request.user
-
   url = 'http://localhost:8000/accounts/'
 
   files = requests.get(url)
   files = json.loads(files.text)
-  mails = list(user.mail_set.all())
+  mails = list(graphUser.mail_set.all())
   dictMails = []
+  # fetch only logged-in graphUser's mails
+  for idx, mail in enumerate(mails):
+    if(mail.user_id != graphUser.id):
+      del mails[idx]
+
   for mail in mails:
     immutableId = mail.immutableId
     immutableId = immutableId[len(immutableId) - 25 : len(immutableId)]
