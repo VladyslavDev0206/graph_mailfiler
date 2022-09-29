@@ -9,6 +9,7 @@ import time
 import json
 from .models import GraphUser
 from .models import Connect
+from .graph_helper import get_user
 
 # Load the oauth_settings.yml file
 stream = open('oauth_settings.yml', 'r')
@@ -62,6 +63,9 @@ def get_token_from_code(request):
   flow = request.session.pop('auth_flow', {})
 
   result = auth_app.acquire_token_by_auth_code_flow(flow, request.GET)
+  
+  user = get_user(result['access_token'])
+  store_user(request, user)
   save_cache(request, cache)
 
   return result
