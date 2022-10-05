@@ -1,3 +1,4 @@
+from email.policy import default
 from unittest.util import _MAX_LENGTH
 from django.db import models
 from django.contrib.auth import get_user_model
@@ -25,8 +26,10 @@ class Mail(models.Model):
     subject = models.CharField(max_length=266)
     bodyPreview = models.CharField(max_length=266)
     sender = models.CharField(max_length=266)
+    to = models.CharField(max_length=266, default='')
     receivedDateTime = models.DateField()
     user = models.ForeignKey(GraphUser, on_delete=models.CASCADE)
+    mail_type = models.CharField(max_length=266, default='inbox')
 
     @classmethod
     def create(cls, immutableId, subject, bodyPreview, sender, receivedDateTime):

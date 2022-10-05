@@ -64,11 +64,10 @@ def get_inbox(token, timezone):
     'Authorization': 'Bearer {0}'.format(token),
     'Prefer': 'IdType="ImmutableId"'
   }
-  print('token', token)
 
-  endpoint = '/me/mailFolders/inbox/messages'
+  endpoint = '/me/messages'
   # Only request specific properties
-  select = 'id,from,isRead,receivedDateTime,subject,body,bodyPreview'
+  select = 'id,from,isRead,receivedDateTime,subject,body,bodyPreview,toRecipients'
   # Get at most 25 results
   top = 25
   # Sort by received time, newest first
@@ -88,7 +87,7 @@ def get_message(token, endpoint):
     'Prefer': 'IdType="ImmutableId"'
   }
   # Only request specific properties
-  select = 'id,from,isRead,receivedDateTime,subject,body,bodyPreview'
+  select = 'id,from,isRead,receivedDateTime,subject,body,bodyPreview,toRecipients'
   request_url = f'{graph_url}/{endpoint}?$select={select}'
 
   message_response = requests.get(request_url,

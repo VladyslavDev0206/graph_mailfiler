@@ -15,6 +15,7 @@
       <th scope="col" style="display:none">body</th>
       <th scope="col" style="display:none">BodyPreview</th>
       <th scope="col">From</th>
+      <th scope="col">To</th>
       <th scope="col" style="display:none">Read</th>
       <th scope="col">Received</th>
       <th scope="col">Attachments<br><input onclick='saveAllAttachments()' type="checkbox" id="saveAllAttachments"></th>
@@ -30,6 +31,7 @@
           <td style="display:none">{{ mail.body }}</td>
           <td style="display:none">{{ mail.bodyPreview }}...</td>
           <td>{{ mail.from.emailAddress.name }}</td>
+          <td>{{ mail.toRecipients.0.emailAddress.name }}</td>
           <td style="display:none">{{ mail.isRead }}</td>
           <td >{{ mail.receivedDateTime }}</td>
           {% if mail.attachment_list|length > 0 %}
@@ -54,7 +56,7 @@
   let contextMails = JSON.parse('{{ jsonMails|escapejs }}')
 
   function saveMails(){
-    let fields = ['immutableId', 'subject', 'body', 'bodyPreview', 'sender', 'isRead', 'receivedDateTime', 'checkedAttach','checked'];
+    let fields = ['immutableId', 'subject', 'body', 'bodyPreview', 'sender', 'to', 'isRead', 'receivedDateTime', 'checkedAttach','checked'];
     let mails = [];
     $( "tr" ).each(function( trIndex ) {
       if(trIndex > 0){
@@ -84,7 +86,7 @@
     title = (title.split('@')[0]).slice(0, 5)
     title += '_' + formatDate(new Date(Date.now()))
 
-    $.post("{% url 'saveMail' %}",
+    $.post("{% url 'saveMail' %}?mail_type=inbox",
     {
       mails : mails,
       title : title

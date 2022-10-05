@@ -4,7 +4,7 @@
 <!-- <CalendarSnippet> -->
 {% extends "mailfiler/layout.html" %}
 {% block content %}
-<a href="{% url 'mail' %}" class="btn btn-primary m-2">Download Mails</a>
+<a href="{% url 'mail' %}?mail_type=inbox" class="btn btn-primary m-2" id="download_link">Download Mails</a>
 <!-- <a href="/calendar/new" class="btn btn-light btn-sm mb-3">New event</a> -->
 {% csrf_token %}
 <table class="table">
@@ -13,7 +13,8 @@
       <th scope="col">Id</th>
       <th scope="col">Subject</th>
       <th scope="col">BodyPreview</th>
-      <th scope="col">From</th>
+      <th scope="col" id="from_header">From</th>
+      <th scope="col" id="to_header">To</th>
       <th scope="col">ReceivedDateTime</th>
       <th scope="col">Attachments</th>
       <th scope="col">Url</th>
@@ -26,7 +27,8 @@
           <td>{{ mail.immutableId }}</td>
           <td>{{ mail.subject }}</td>
           <td>{{ mail.bodyPreview }}</td>
-          <td>{{ mail.sender }}</td>
+          <td class="from_body">{{ mail.sender }}</td>
+          <td class="to_body">{{ mail.to }}</td>
           <td>{{ mail.receivedDateTime }}</td>
           {% if mail.attachments|length > 0 %}
           <td><input onclick="showAttaches('{{mail.immutableId}}')" type='button' class="secondary" value="See"></td>
@@ -47,8 +49,27 @@
 {% endblock %}
 {% block script %}
 <script>
+  // check the mail_type
+  let params = (new URL(document.location)).searchParams;
+  let mail_type = params.get("mail_type");
+  $('#download_link').prop('href', "{% url 'mail' %}?mail_type=" + mail_type)
+  if(mail_type == 'inbox'){
+    $('#to_header').hide();
+    to_body = $('.to_body');
+    to_body.each((idx, element) => {
+      console.log(element)
+      $(element).hide()
+    });
+  }
+  else {
+    $('#from_header').hide();
+    from_body = $('.from_body');
+    from_body.each((idx, element) => {
+      $(element).hide()
+    });
+  }
+
   let contextMails = JSON.parse('{{ jsonMails|escapejs }}')
-  console.log(contextMails)
   var cancelButton = document.getElementById('cancel')
   var favDialog = document.getElementById('favDialog')
 

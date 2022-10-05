@@ -47,14 +47,16 @@ def home(request):
           graphUser = GraphUser.objects.get(graph_user_id=graph_user_id)
           token = get_token_with_graph_user(graph_user_id)
           mail = get_message(token, subscription['resource'])
+          mail_type = 'inbox'
+          if(mail['from']['emailAddress']['name'] == graphUser.name):
+            mail_type = 'sent_item'
           date = mail['receivedDateTime']
           date = parser.isoparse(date)
-          print(date)
           if(settings['schema_id'] in get_schema_extension(token, mail['id'], settings['schema_id'])):
             return HttpResponse('mail already downloaded', 'text/plain')
           ### save mail ###
           # Upload mail html file
-          newMail = Mail(immutableId = mail['id'], subject = mail['subject'], bodyPreview = mail['bodyPreview'], sender = mail['from']['emailAddress']['name'], receivedDateTime = date, user_id = graphUser.id)
+          newMail = Mail(immutableId = mail['id'], subject = mail['subject'], bodyPreview = mail['bodyPreview'], sender = mail['from']['emailAddress']['name'], receivedDateTime = date, user_id = graphUser.id, mail_type = mail_type, to = mail['toRecipients'][0]['emailAddress']['name'])
           # Save mail reference to database
           newMail.save()
           title = mail['id'][len(mail['id']) - 25 : len(mail['id'])]
@@ -109,7 +111,6 @@ def home(request):
                 fileObj = {'document' : fp}
 
                 x = requests.post(url, data = jsonObj, files = fileObj)
-                print('attachresponse', x.text)
                 # delete attachment file
                 fp.close()
                 if(os.path.exists(r'C:\demos\%s' % attach['name'])):
@@ -223,7 +224,6 @@ def calendar(request):
 def mail(request):
   context = initialize_context(request)
   user = context['graphUser']
-
   token = get_token(request)
 
   schema_extension = is_schema_extension_defined(token, settings['schema_id'])
@@ -246,6 +246,14 @@ def mail(request):
     for idx, mail in enumerate(mails):
       # check if the mail is already downloaded
       if(settings['schema_id'] in get_schema_extension(token, mail['id'], settings['schema_id'])):
+        downloaded_mail_idx.append(idx)
+        continue
+      # check if this mail is for inbox or for sent item
+      if(mail['from']['emailAddress']['name'] == user['name'] and request.GET.get('mail_type') == 'inbox'):
+        downloaded_mail_idx.append(idx)
+        continue
+      # check if this mail is for inbox or for sent item
+      if(mail['from']['emailAddress']['name'] != user['name'] and request.GET.get('mail_type') == 'sent_item'):
         downloaded_mail_idx.append(idx)
         continue
       # fetch attachments
@@ -317,7 +325,10 @@ def mailSave(request):
 
     for mail in mails:
       # Upload mail html file
-      newMail = Mail(immutableId = mail['immutableId'], subject = mail['subject'], bodyPreview = mail['bodyPreview'], sender = mail['sender'], receivedDateTime = mail['receivedDateTime'], user_id = graphUser.id)
+      mail_type = 'inbox'
+      if(mail['sender'] == graphUser.name):
+        mail_type = 'sent_item'
+      newMail = Mail(immutableId = mail['immutableId'], subject = mail['subject'], bodyPreview = mail['bodyPreview'], sender = mail['sender'], receivedDateTime = mail['receivedDateTime'], user_id = graphUser.id, mail_type = mail_type, to = mail['to'])
       # Save mail reference to database
       newMail.save()
       title = mail['immutableId'][len(mail['immutableId']) - 25 : len(mail['immutableId'])]
@@ -382,12 +393,17 @@ def mailSave(request):
 
   files = requests.get(url)
   files = json.loads(files.text)
-  mails = list(graphUser.mail_set.all())
+  mails = list(graphUser.mail_set.all().order_by('-receivedDateTime'))
   dictMails = []
   # fetch only logged-in graphUser's mails
+  del_item_idx = []
   for idx, mail in enumerate(mails):
-    if(mail.user_id != graphUser.id):
-      del mails[idx]
+    if(mail.user_id != graphUser.id or mail.mail_type != request.GET.get('mail_type')):
+      del_item_idx.append(idx)
+  offset = 0
+  for idx in del_item_idx:
+    del mails[idx - offset]
+    offset +=1
 
   for mail in mails:
     immutableId = mail.immutableId
