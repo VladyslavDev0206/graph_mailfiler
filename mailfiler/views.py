@@ -48,7 +48,7 @@ def home(request):
           token = get_token_with_graph_user(graph_user_id)
           mail = get_message(token, subscription['resource'])
           mail_type = 'inbox'
-          if(mail['from']['emailAddress']['name'] == graphUser.name):
+          if(mail['from']['emailAddress']['address'] == graphUser.email):
             mail_type = 'sent_item'
           date = mail['receivedDateTime']
           date = parser.isoparse(date)
@@ -56,9 +56,8 @@ def home(request):
             return HttpResponse('mail already downloaded', 'text/plain')
           ### save mail ###
           # Upload mail html file
-          newMail = Mail(immutableId = mail['id'], subject = mail['subject'], bodyPreview = mail['bodyPreview'], sender = mail['from']['emailAddress']['name'], receivedDateTime = date, user_id = graphUser.id, mail_type = mail_type, to = mail['toRecipients'][0]['emailAddress']['name'])
+          newMail = Mail(immutableId = mail['id'], subject = mail['subject'], bodyPreview = mail['bodyPreview'], sender = mail['from']['emailAddress']['address'], receivedDateTime = date, user_id = graphUser.id, mail_type = mail_type, to = mail['toRecipients'][0]['emailAddress']['address'])
           # Save mail reference to database
-          newMail.save()
           title = mail['id'][len(mail['id']) - 25 : len(mail['id'])]
           
           with open(r'C:\demos\%s.html' % title, 'w+', encoding='utf-8') as fp:
@@ -89,8 +88,8 @@ def home(request):
           if 'value' in attachment_list:
             attachment_list = attachment_list['value']
             for attach in attachment_list:
+              newMail.save()
               newAttach = Attachment(immutableId = attach['id'], name = attach['name'], contentType = attach['contentType'], size= attach['size'], mail_id = newMail.id)
-              newAttach.save()
               title = attach['id']
               title = title[len(title) - 25 : len(title)]
               typeStr = attach["name"][len(attach["name"]) - 4:len(attach["name"])]
@@ -115,6 +114,8 @@ def home(request):
                 fp.close()
                 if(os.path.exists(r'C:\demos\%s' % attach['name'])):
                   os.remove(r'C:\demos\%s' % attach['name'])
+              newAttach.save()
+          newMail.save()
           
           return HttpResponse('mail downloaded', 'text/plain')
 
@@ -245,15 +246,18 @@ def mail(request):
     # iterate mails and get attachment_list
     for idx, mail in enumerate(mails):
       # check if the mail is already downloaded
+      if(not 'from' in mail):
+        downloaded_mail_idx.append(idx)
+        continue
       if(settings['schema_id'] in get_schema_extension(token, mail['id'], settings['schema_id'])):
         downloaded_mail_idx.append(idx)
         continue
       # check if this mail is for inbox or for sent item
-      if(mail['from']['emailAddress']['name'] == user['name'] and request.GET.get('mail_type') == 'inbox'):
+      if(mail['from']['emailAddress']['address'] == user['email'] and request.GET.get('mail_type') == 'inbox'):
         downloaded_mail_idx.append(idx)
         continue
       # check if this mail is for inbox or for sent item
-      if(mail['from']['emailAddress']['name'] != user['name'] and request.GET.get('mail_type') == 'sent_item'):
+      if(mail['from']['emailAddress']['address'] != user['email'] and request.GET.get('mail_type') == 'sent_item'):
         downloaded_mail_idx.append(idx)
         continue
       # fetch attachments
@@ -326,11 +330,10 @@ def mailSave(request):
     for mail in mails:
       # Upload mail html file
       mail_type = 'inbox'
-      if(mail['sender'] == graphUser.name):
+      if(mail['sender'] == graphUser.email):
         mail_type = 'sent_item'
       newMail = Mail(immutableId = mail['immutableId'], subject = mail['subject'], bodyPreview = mail['bodyPreview'], sender = mail['sender'], receivedDateTime = mail['receivedDateTime'], user_id = graphUser.id, mail_type = mail_type, to = mail['to'])
       # Save mail reference to database
-      newMail.save()
       title = mail['immutableId'][len(mail['immutableId']) - 25 : len(mail['immutableId'])]
       
       with open(r'C:\demos\%s.html' % title, 'w+', encoding='utf-8') as fp:
@@ -357,8 +360,8 @@ def mailSave(request):
       # Upload attachment files
       if 'attachments' in mail:
         for attach in mail['attachments']:
+          newMail.save()
           newAttach = Attachment(immutableId = attach['id'], name = attach['name'], contentType = attach['contentType'], size= attach['size'], mail_id = newMail.id)
-          newAttach.save()
           title = attach['id']
           title = title[len(title) - 25 : len(title)]
           typeStr = attach["name"][len(attach["name"]) - 4:len(attach["name"])]
@@ -384,6 +387,8 @@ def mailSave(request):
             fp.close()
             if(os.path.exists(r'C:\demos\%s' % attach['name'])):
               os.remove(r'C:\demos\%s' % attach['name'])
+          newAttach.save()
+      newMail.save()
 
     return HttpResponse('Mails Saved Successfuly')
   
@@ -445,44 +450,44 @@ def mailSave(request):
 
 # </RegisterViewSnippet>
 def register_request(request):
-	if request.method == "POST":
-		form = NewUserForm(request.POST)
-		if form.is_valid():
-			user = form.save()
-			login(request, user)
-			messages.success(request, "Registration successful." )
-			return redirect("home")
-		messages.error(request, "Unsuccessful registration. Invalid information.")
-	form = NewUserForm()
-	return render (request=request, template_name="mailfiler/register.html", context={"register_form":form})
+  if request.method == "POST":
+    form = NewUserForm(request.POST)
+    if form.is_valid():
+      user = form.save()
+      login(request, user)
+      messages.success(request, "Registration successful." )
+      return redirect("home")
+    messages.error(request, "Unsuccessful registration. Invalid information.")
+  form = NewUserForm()
+  return render (request=request, template_name="mailfiler/register.html", context={"register_form":form})
 # </RegisterViewSnippet>
 
 # </LoginViewSnippet>
 def login_request(request):
-	if request.method == "POST":
-		form = AuthenticationForm(request, data=request.POST)
-		if form.is_valid():
-			username = form.cleaned_data.get('username')
-			password = form.cleaned_data.get('password')
-			user = authenticate(username=username, password=password)
-			if user is not None:
-				login(request, user)
-				messages.info(request, f"You are now logged in as {username}.")
-				return redirect("home")
-			else:
-				messages.error(request,"Invalid username or password.")
-		else:
-			messages.error(request,"Invalid username or password.")
-	form = AuthenticationForm()
-	return render(request=request, template_name="mailfiler/login.html", context={"login_form":form})
+  if request.method == "POST":
+    form = AuthenticationForm(request, data=request.POST)
+    if form.is_valid():
+      username = form.cleaned_data.get('username')
+      password = form.cleaned_data.get('password')
+      user = authenticate(username=username, password=password)
+      if user is not None:
+        login(request, user)
+        messages.info(request, f"You are now logged in as {username}.")
+        return redirect("home")
+      else:
+        messages.error(request,"Invalid username or password.")
+    else:
+      messages.error(request,"Invalid username or password.")
+  form = AuthenticationForm()
+  return render(request=request, template_name="mailfiler/login.html", context={"login_form":form})
   # </LoginViewSnippet>
 
   
 # </LogoutViewSnippet>
 def logout_request(request):
-	logout(request)
-	messages.info(request, "You have successfully logged out.") 
-	return redirect("home")
+  logout(request)
+  messages.info(request, "You have successfully logged out.") 
+  return redirect("home")
 # </LogoutViewSnippet>
 
 # </DropBoxViewSet>

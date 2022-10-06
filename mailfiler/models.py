@@ -27,7 +27,7 @@ class Mail(models.Model):
     bodyPreview = models.CharField(max_length=266)
     sender = models.CharField(max_length=266)
     to = models.CharField(max_length=266, default='')
-    receivedDateTime = models.DateField()
+    receivedDateTime = models.DateTimeField()
     user = models.ForeignKey(GraphUser, on_delete=models.CASCADE)
     mail_type = models.CharField(max_length=266, default='inbox')
 

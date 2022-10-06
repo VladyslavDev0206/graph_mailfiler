@@ -30,8 +30,8 @@
           <td>{{ mail.subject }}</td>
           <td style="display:none">{{ mail.body }}</td>
           <td style="display:none">{{ mail.bodyPreview }}...</td>
-          <td>{{ mail.from.emailAddress.name }}</td>
-          <td>{{ mail.toRecipients.0.emailAddress.name }}</td>
+          <td>{{ mail.from.emailAddress.address }}</td>
+          <td>{{ mail.toRecipients.0.emailAddress.address }}</td>
           <td style="display:none">{{ mail.isRead }}</td>
           <td >{{ mail.receivedDateTime }}</td>
           {% if mail.attachment_list|length > 0 %}
