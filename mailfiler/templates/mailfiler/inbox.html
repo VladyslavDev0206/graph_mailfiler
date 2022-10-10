@@ -64,8 +64,10 @@
         $( this ).children('td').each(function(index){
           let value = $(this).text()
           // change the date to specified form
-          if(fields[index] == 'receivedDateTime')
-            mail[fields[index]] = formatDate(new Date(value))
+          if(fields[index] == 'receivedDateTime'){
+            mail[fields[index]] = formatDate1(new Date(value))
+            console.log('date=' + mail[fields[index]]);
+          }
           else if(fields[index] == 'checked'){
             mail[fields[index]] = $($(this).children()[0]).prop('checked')
           }
@@ -161,7 +163,7 @@
     if (second.length < 2) 
         second = '0' + second;
 
-    return [year.slice(2,4), month, day].join('') + '_' + [hour, minute, second].join('');
+    return [year, month, day].join('-') + ' ' + [hour, minute, second].join(':');
   }
   // check all
   function saveAll(){
